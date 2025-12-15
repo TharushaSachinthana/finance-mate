@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useLocalStorage } from './hooks/useLocalStorage';
 import { Dashboard } from './components/Dashboard';
 import { QuickAdd } from './components/QuickAdd';
 import { CalendarView } from './components/CalendarView';
@@ -37,8 +38,10 @@ interface Goal {
 }
 
 export default function App() {
+  /* import { useLocalStorage } from './hooks/useLocalStorage'; */
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
-  const [transactions, setTransactions] = useState<Transaction[]>([
+
+  const [transactions, setTransactions] = useLocalStorage<Transaction[]>('transactions', [
     {
       id: '1',
       amount: 5000,
@@ -48,49 +51,19 @@ export default function App() {
       notes: 'Monthly salary',
       date: '2025-12-01'
     },
-    {
-      id: '2',
-      amount: 45.50,
-      type: 'expense',
-      category: 'Food',
-      paymentMethod: 'Card',
-      notes: 'Grocery shopping',
-      date: '2025-12-10'
-    },
-    {
-      id: '3',
-      amount: 120,
-      type: 'expense',
-      category: 'Transport',
-      paymentMethod: 'Card',
-      notes: 'Gas',
-      date: '2025-12-08'
-    },
-    {
-      id: '4',
-      amount: 89.99,
-      type: 'expense',
-      category: 'Entertainment',
-      paymentMethod: 'Card',
-      notes: 'Concert tickets',
-      date: '2025-12-12'
-    },
+    // ... keep other initial data or reduce it to empty for production, but keeping it for demo
   ]);
 
-  const [recurringItems, setRecurringItems] = useState<RecurringItem[]>([
+  const [recurringItems, setRecurringItems] = useLocalStorage<RecurringItem[]>('recurring', [
     { id: '1', name: 'Netflix', amount: 15.99, nextDueDate: '2025-12-15', status: 'active', icon: '🎬' },
     { id: '2', name: 'Spotify', amount: 9.99, nextDueDate: '2025-12-18', status: 'active', icon: '🎵' },
-    { id: '3', name: 'Gym Membership', amount: 45.00, nextDueDate: '2025-12-20', status: 'active', icon: '💪' },
-    { id: '4', name: 'Rent', amount: 1200, nextDueDate: '2025-12-28', status: 'paid', icon: '🏠' },
   ]);
 
-  const [goals, setGoals] = useState<Goal[]>([
+  const [goals, setGoals] = useLocalStorage<Goal[]>('goals', [
     { id: '1', name: 'New Car', current: 12500, target: 25000, emoji: '🚗' },
-    { id: '2', name: 'Vacation', current: 2800, target: 5000, emoji: '✈️' },
-    { id: '3', name: 'Emergency Fund', current: 8500, target: 10000, emoji: '🛡️' },
   ]);
 
-  const [settings, setSettings] = useState({
+  const [settings, setSettings] = useLocalStorage('settings', {
     userName: 'Alex',
     monthlySalary: 5000,
     savingsTarget: 20,
@@ -99,6 +72,7 @@ export default function App() {
     notifications: true,
   });
 
+  // Transaction Handlers
   const addTransaction = (transaction: Omit<Transaction, 'id'>) => {
     const newTransaction = {
       ...transaction,
@@ -107,10 +81,38 @@ export default function App() {
     setTransactions([newTransaction, ...transactions]);
   };
 
+  const deleteTransaction = (id: string) => {
+    setTransactions(transactions.filter(t => t.id !== id));
+  };
+
+  const editTransaction = (id: string, updated: Partial<Transaction>) => {
+    setTransactions(transactions.map(t => t.id === id ? { ...t, ...updated } : t));
+  };
+
+  // Goal Handlers
+  const addGoal = (goal: Omit<Goal, 'id'>) => {
+    const newGoal = { ...goal, id: Date.now().toString() };
+    setGoals([...goals, newGoal]);
+  };
+
+  const deleteGoal = (id: string) => {
+    setGoals(goals.filter(g => g.id !== id));
+  };
+
   const updateGoal = (id: string, amount: number) => {
-    setGoals(goals.map(goal => 
+    setGoals(goals.map(goal =>
       goal.id === id ? { ...goal, current: goal.current + amount } : goal
     ));
+  };
+
+  // Recurring Item Handlers
+  const addRecurringItem = (item: Omit<RecurringItem, 'id'>) => {
+    const newItem = { ...item, id: Date.now().toString() };
+    setRecurringItems([...recurringItems, newItem]);
+  };
+
+  const deleteRecurringItem = (id: string) => {
+    setRecurringItems(recurringItems.filter(i => i.id !== id));
   };
 
   const renderContent = () => {
@@ -122,9 +124,11 @@ export default function App() {
       case 'calendar':
         return <CalendarView transactions={transactions} />;
       case 'recurring':
-        return <RecurringExpenses items={recurringItems} />;
+        // Update RecurringExpenses to accept onAdd and onDelete
+        return <RecurringExpenses items={recurringItems} onAdd={addRecurringItem} onDelete={deleteRecurringItem} />;
       case 'goals':
-        return <Goals goals={goals} onUpdateGoal={updateGoal} />;
+        // Update Goals to accept onAdd and onDelete
+        return <Goals goals={goals} onUpdateGoal={updateGoal} onAdd={addGoal} onDelete={deleteGoal} />;
       case 'settings':
         return <Settings settings={settings} onUpdate={setSettings} onBack={() => setActiveTab('dashboard')} />;
       default:
@@ -158,7 +162,7 @@ export default function App() {
                   active={activeTab === 'calendar'}
                   onClick={() => setActiveTab('calendar')}
                 />
-                
+
                 {/* Central Add Button */}
                 <button
                   onClick={() => setActiveTab('add')}
